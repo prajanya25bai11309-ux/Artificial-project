@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Agent — Environment Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0c10;
+        --surface: #111318;
+        --surface2: #1a1d25;
+        --border: rgba(255, 255, 255, 0.07);
+        --accent: #00e5a0;
+        --accent2: #5b8cff;
+        --danger: #ff4d6a;
+        --warn: #ffb347;
+        --muted: rgba(255, 255, 255, 0.35);
+        --text: rgba(255, 255, 255, 0.88);
+        --mono: "Space Mono", monospace;
+        --sans: "DM Sans", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 24px 16px;
+      }
+
+      #root {
+        width: 100%;
+        max-width: 900px;
+        display: grid;
+        grid-template-columns: 1fr 220px;
+        grid-template-rows: auto 1fr auto;
+        gap: 14px;
+      }
+
+      #header {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 0.5px solid var(--border);
+        padding-bottom: 12px;
+      }
+
+      .title-block h1 {
+        font-family: var(--mono);
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .title-block p {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+        font-weight: 300;
+      }
+
+      .stats-row {
+        display: flex;
+        gap: 18px;
+      }
+      .stat {
+        text-align: right;
+      }
+      .stat-val {
+        font-family: var(--mono);
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .stat-label {
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      #arena {
+        background: var(--surface);
+        border: 0.5px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      #grid-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex: 1;
+      }
+
+      #grid {
+        display: grid;
+        gap: 3px;
+      }
+
+      .cell {
+        width: 38px;
+        height: 38px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition:
+          background 0.18s,
+          transform 0.12s;
+        position: relative;
+        cursor: default;
+      }
+
+      .cell.empty {
+        background: var(--surface2);
+      }
+      .cell.wall {
+        background: #1e2230;
+        border: 0.5px solid rgba(255, 255, 255, 0.04);
+      }
+      .cell.goal {
+        background: rgba(0, 229, 160, 0.12);
+        border: 0.5px solid rgba(0, 229, 160, 0.35);
+        animation: pulse-g 1.6s infinite;
+      }
+      .cell.hazard {
+        background: rgba(255, 77, 106, 0.12);
+        border: 0.5px solid rgba(255, 77, 106, 0.3);
+        animation: pulse-r 1.6s infinite;
+      }
+      .cell.bonus {
+        background: rgba(91, 140, 255, 0.12);
+        border: 0.5px solid rgba(91, 140, 255, 0.3);
+      }
+      .cell.agent {
+        background: rgba(0, 229, 160, 0.22);
+        border: 0.5px solid rgba(0, 229, 160, 0.7);
+        transform: scale(1.08);
+        z-index: 2;
+      }
+      .cell.visited {
+        background: rgba(91, 140, 255, 0.06);
+      }
+      .cell.path {
+        background: rgba(0, 229, 160, 0.08);
+        border: 0.5px solid rgba(0, 229, 160, 0.15);
+      }
+
+      @keyframes pulse-g {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 0 6px rgba(0, 229, 160, 0);
+        }
+      }
+      @keyframes pulse-r {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(255, 77, 106, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 0 6px rgba(255, 77, 106, 0);
+        }
+      }
+
+      #panel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .panel-card {
+        background: var(--surface);
+        border: 0.5px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+
+      .panel-card h3 {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+
+      #thought-log {
+        font-size: 11px;
+        line-height: 1.65;
+        color: var(--muted);
+        min-height: 90px;
+        font-family: var(--mono);
+      }
+
+      .thought-line {
+        margin-bottom: 3px;
+      }
+      .thought-line.new {
+        color: var(--accent);
+      }
+      .thought-line.warn {
+        color: var(--warn);
+      }
+      .thought-line.bad {
+        color: var(--danger);
+      }
+      .thought-line.good {
+        color: var(--accent);
+      }
+
+      .sense-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+
+      .sense-cell {
+        background: var(--surface2);
+        border-radius: 4px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        border: 0.5px solid transparent;
+      }
+
+      .sense-cell.danger-sense {
+        border-color: rgba(255, 77, 106, 0.5);
+        background: rgba(255, 77, 106, 0.1);
+      }
+      .sense-cell.goal-sense {
+        border-color: rgba(0, 229, 160, 0.5);
+        background: rgba(0, 229, 160, 0.1);
+      }
+      .sense-cell.bonus-sense {
+        border-color: rgba(91, 140, 255, 0.5);
+        background: rgba(91, 140, 255, 0.1);
+      }
+      .sense-cell.self {
+        border-color: rgba(0, 229, 160, 0.7);
+        background: rgba(0, 229, 160, 0.15);
+      }
+      .sense-cell.wall-sense {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .bar-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+      }
+      .bar-label {
+        font-size: 10px;
+        color: var(--muted);
+        width: 52px;
+        flex-shrink: 0;
+      }
+      .bar-track {
+        flex: 1;
+        height: 5px;
+        background: var(--surface2);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s;
+      }
+      .bar-val {
+        font-family: var(--mono);
+        font-size: 10px;
+        width: 28px;
+        text-align: right;
+        color: var(--muted);
+      }
+
+      #controls-bar {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 7px 16px;
+        border-radius: 6px;
+        border: 0.5px solid var(--border);
+        background: var(--surface2);
+        color: var(--text);
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+
+      .btn:hover {
+        background: var(--surface);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      .btn.primary {
+        background: rgba(0, 229, 160, 0.12);
+        border-color: rgba(0, 229, 160, 0.4);
+        color: var(--accent);
+      }
+      .btn.primary:hover {
+        background: rgba(0, 229, 160, 0.22);
+      }
+      .btn.danger-btn {
+        background: rgba(255, 77, 106, 0.1);
+        border-color: rgba(255, 77, 106, 0.35);
+        color: var(--danger);
+      }
+
+      .speed-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+      }
+      .speed-row label {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      input[type="range"] {
+        width: 80px;
+        accent-color: var(--accent);
+      }
+
+      #mode-badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        border: 0.5px solid rgba(0, 229, 160, 0.4);
+        color: var(--accent);
+        background: rgba(0, 229, 160, 0.08);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      #mode-badge.paused {
+        border-color: rgba(255, 179, 71, 0.4);
+        color: var(--warn);
+        background: rgba(255, 179, 71, 0.08);
+      }
+      #mode-badge.dead {
+        border-color: rgba(255, 77, 106, 0.4);
+        color: var(--danger);
+        background: rgba(255, 77, 106, 0.08);
+      }
+      #mode-badge.won {
+        border-color: rgba(0, 229, 160, 0.7);
+        color: var(--accent);
+        background: rgba(0, 229, 160, 0.18);
+      }
+
+      .legend-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 10px;
+        color: var(--muted);
+        align-items: center;
+      }
+      .leg {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .leg-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="header">
+        <div class="title-block">
+          <h1>AI Agent — Environment Explorer</h1>
+          <p>Watch the agent perceive, reason, and act in real time</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat">
+            <div class="stat-val" id="score-val">0</div>
+            <div class="stat-label">Score</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="steps-val">0</div>
+            <div class="stat-label">Steps</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="goals-val">0</div>
+            <div class="stat-label">Goals</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="arena">
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <span id="mode-badge">Running</span>
+          <div class="legend-row">
+            <div class="leg">
+              <div
+                class="leg-dot"
+                style="background: rgba(0, 229, 160, 0.5)"
+              ></div>
+              Goal
+            </div>
+            <div class="leg">
+              <div
+                class="leg-dot"
+                style="background: rgba(255, 77, 106, 0.45)"
+              ></div>
+              Hazard
+            </div>
+            <div class="leg">
+              <div
+                class="leg-dot"
+                style="background: rgba(91, 140, 255, 0.5)"
+              ></div>
+              Bonus
+            </div>
+            <div class="leg">
+              <div
+                class="leg-dot"
+                style="
+                  background: #1e2230;
+                  border: 0.5px solid rgba(255, 255, 255, 0.08);
+                "
+              ></div>
+              Wall
+            </div>
+            <div class="leg">
+              <div
+                class="leg-dot"
+                style="
+                  background: rgba(0, 229, 160, 0.22);
+                  border: 0.5px solid rgba(0, 229, 160, 0.7);
+                "
+              ></div>
+              Agent
+            </div>
+          </div>
+        </div>
+        <div id="grid-wrap"><div id="grid"></div></div>
+      </div>
+
+      <div id="panel">
+        <div class="panel-card">
+          <h3>Perception (3x3)</h3>
+          <div class="sense-grid" id="sense-grid"></div>
+          <div style="font-size: 10px; color: var(--muted)">
+            Agent's immediate sensory field
+          </div>
+        </div>
+        <div class="panel-card">
+          <h3>Internal State</h3>
+          <div class="bar-row">
+            <span class="bar-label">Health</span>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                id="hp-bar"
+                style="background: #00e5a0; width: 100%"
+              ></div>
+            </div>
+            <span class="bar-val" id="hp-val">100</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Curiosity</span>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                id="cur-bar"
+                style="background: #5b8cff; width: 50%"
+              ></div>
+            </div>
+            <span class="bar-val" id="cur-val">50</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Confidence</span>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                id="conf-bar"
+                style="background: #ffb347; width: 70%"
+              ></div>
+            </div>
+            <span class="bar-val" id="conf-val">70</span>
+          </div>
+        </div>
+        <div class="panel-card" style="flex: 1">
+          <h3>Thought Log</h3>
+          <div id="thought-log"></div>
+        </div>
+      </div>
+
+      <div id="controls-bar">
+        <button class="btn primary" id="play-btn" onclick="togglePlay()">
+          Pause
+        </button>
+        <button class="btn" onclick="stepOnce()">Step</button>
+        <button class="btn" onclick="toggleMode()">
+          Mode: <span id="mode-txt">Auto</span>
+        </button>
+        <button class="btn danger-btn" onclick="resetGame()">Reset</button>
+        <div class="speed-row">
+          <label>Speed</label>
+          <input type="range" id="speed" min="1" max="10" value="5" step="1" />
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const COLS = 10,
+        ROWS = 9;
+      const EMPTY = 0,
+        WALL = 1,
+        GOAL = 2,
+        HAZARD = 3,
+        BONUS = 4;
+
+      let state = {};
+      let intervalId = null;
+      let running = true;
+      let manualMode = false;
+      let thoughts = [];
+
+      function initGame() {
+        const map = Array.from({ length: ROWS }, () => Array(COLS).fill(EMPTY));
+        const visited = Array.from({ length: ROWS }, () =>
+          Array(COLS).fill(false),
+        );
+
+        const walls = [
+          [1, 2],
+          [1, 3],
+          [2, 6],
+          [3, 1],
+          [3, 5],
+          [3, 6],
+          [4, 3],
+          [4, 8],
+          [5, 2],
+          [5, 4],
+          [5, 7],
+          [6, 1],
+          [6, 6],
+          [7, 4],
+          [7, 5],
+          [7, 8],
+          [8, 2],
+          [8, 7],
+        ];
+        walls.forEach(([r, c]) => {
+          if (r < ROWS && c < COLS) map[r][c] = WALL;
+        });
+
+        const goals = [
+          [0, 9],
+          [4, 6],
+          [8, 9],
+        ];
+        goals.forEach(([r, c]) => {
+          if (r < ROWS && c < COLS) map[r][c] = GOAL;
+        });
+
+        const hazards = [
+          [2, 4],
+          [4, 1],
+          [6, 8],
+          [8, 5],
+        ];
+        hazards.forEach(([r, c]) => {
+          if (r < ROWS && c < COLS) map[r][c] = HAZARD;
+        });
+
+        const bonuses = [
+          [1, 7],
+          [5, 9],
+          [7, 2],
+        ];
+        bonuses.forEach(([r, c]) => {
+          if (r < ROWS && c < COLS) map[r][c] = BONUS;
+        });
+
+        state = {
+          map,
+          visited,
+          agent: { r: 0, c: 0 },
+          hp: 100,
+          curiosity: 50,
+          confidence: 70,
+          score: 0,
+          steps: 0,
+          goals: 0,
+          alive: true,
+          won: false,
+          path: [],
+          goalsLeft: goals.map((g) => [...g]),
+          lastMove: null,
+        };
+        visited[0][0] = true;
+        thoughts = [];
+        addThought("Agent initialized. Scanning environment...", "new");
+        addThought("Objective: reach all goals, avoid hazards.", "");
+      }
+
+      function getCell(r, c) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return -1;
+        return state.map[r][c];
+      }
+
+      function perceive() {
+        const { r, c } = state.agent;
+        const grid = [];
+        for (let dr = -1; dr <= 1; dr++)
+          for (let dc = -1; dc <= 1; dc++) grid.push(getCell(r + dr, c + dc));
+        return grid;
+      }
+
+      function bfsPath(targetList) {
+        const start = [state.agent.r, state.agent.c];
+        if (!targetList.length) return null;
+        const queue = [[...start, []]];
+        const seen = new Set([`${start[0]},${start[1]}`]);
+        while (queue.length) {
+          const [cr, cc, path] = queue.shift();
+          for (const [dr, dc] of [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1],
+          ]) {
+            const nr = cr + dr,
+              nc = cc + dc;
+            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+            const key = `${nr},${nc}`;
+            if (seen.has(key)) continue;
+            const cell = state.map[nr][nc];
+            if (cell === WALL) continue;
+            seen.add(key);
+            const newPath = [...path, [nr, nc]];
+            if (targetList.some(([gr, gc]) => gr === nr && gc === nc))
+              return newPath;
+            if (cell !== HAZARD) queue.push([nr, nc, newPath]);
+          }
+        }
+        return null;
+      }
+
+      function decideMove() {
+        const perception = perceive();
+        const { r, c } = state.agent;
+        const dirs = [
+          [-1, 0, "N"],
+          [1, 0, "S"],
+          [0, -1, "W"],
+          [0, 1, "E"],
+        ];
+
+        const adjacent = dirs
+          .map(([dr, dc, name]) => ({
+            dr,
+            dc,
+            name,
+            nr: r + dr,
+            nc: c + dc,
+            cell: getCell(r + dr, c + dc),
+          }))
+          .filter((d) => d.cell !== -1 && d.cell !== WALL);
+
+        if (!adjacent.length) {
+          addThought("No valid moves. Stuck!", "bad");
+          return null;
+        }
+
+        const goalAdj = adjacent.find((d) => d.cell === GOAL);
+        if (goalAdj) {
+          addThought(
+            `Goal detected ${goalAdj.name}! Moving to collect.`,
+            "good",
+          );
+          state.confidence = Math.min(100, state.confidence + 10);
+          return [goalAdj.nr, goalAdj.nc];
+        }
+
+        const bonusAdj = adjacent.find((d) => d.cell === BONUS);
+        if (bonusAdj && state.score < 80) {
+          addThought(`Bonus nearby (${bonusAdj.name}). Detouring.`, "new");
+          return [bonusAdj.nr, bonusAdj.nc];
+        }
+
+        if (state.goalsLeft.length) {
+          const path = bfsPath(state.goalsLeft);
+          if (path && path.length > 0) {
+            const hazardNear = perception.some((p) => p === HAZARD);
+            if (hazardNear) {
+              addThought(
+                "Hazard detected in vicinity. Proceeding cautiously.",
+                "warn",
+              );
+              state.confidence = Math.max(20, state.confidence - 5);
+            } else if (Math.random() < 0.2) {
+              addThought(`Pathfinding to goal: ${path.length} steps away.`, "");
+            }
+            state.path = path;
+            return path[0];
+          }
+        }
+
+        const unvisited = adjacent.filter(
+          (d) => !state.visited[d.nr][d.dc] && d.cell !== HAZARD,
+        );
+        if (unvisited.length) {
+          const pick = unvisited[Math.floor(Math.random() * unvisited.length)];
+          addThought("Exploring unvisited territory.", "");
+          state.curiosity = Math.min(100, state.curiosity + 3);
+          return [pick.nr, pick.nc];
+        }
+
+        const safe = adjacent.filter((d) => d.cell !== HAZARD);
+        if (safe.length) {
+          if (Math.random() < 0.15)
+            addThought("All nearby cells visited. Backtracking.", "");
+          return [safe[Math.floor(Math.random() * safe.length)]].map((d) => [
+            d.nr,
+            d.nc,
+          ])[0];
+        }
+
+        addThought("Only hazardous paths available. Taking risk!", "warn");
+        state.confidence = Math.max(0, state.confidence - 15);
+        const pick = adjacent[Math.floor(Math.random() * adjacent.length)];
+        return [pick.nr, pick.nc];
+      }
+
+      function step() {
+        if (!state.alive || state.won) return;
+        const next = decideMove();
+        if (!next) return;
+        const [nr, nc] = next;
+        const cellType = state.map[nr][nc];
+
+        state.agent = { r: nr, c: nc };
+        state.steps++;
+        state.visited[nr][nc] = true;
+        state.curiosity = Math.max(10, state.curiosity - 1);
+
+        if (cellType === GOAL) {
+          state.score += 100;
+          state.goals++;
+          state.hp = Math.min(100, state.hp + 10);
+          state.confidence = Math.min(100, state.confidence + 15);
+          state.map[nr][nc] = EMPTY;
+          state.goalsLeft = state.goalsLeft.filter(
+            ([gr, gc]) => !(gr === nr && gc === nc),
+          );
+          addThought(
+            `Goal reached! +100pts. HP +10. ${state.goalsLeft.length} goals remain.`,
+            "good",
+          );
+          if (state.goalsLeft.length === 0) {
+            state.won = true;
+            addThought("ALL GOALS COLLECTED. Mission complete!", "good");
+          }
+        } else if (cellType === HAZARD) {
+          const dmg = 25 + Math.floor(Math.random() * 15);
+          state.hp = Math.max(0, state.hp - dmg);
+          state.score = Math.max(0, state.score - 20);
+          state.confidence = Math.max(0, state.confidence - 20);
+          addThought(`Hazard hit! -${dmg} HP. -20pts. Ouch.`, "bad");
+          if (state.hp <= 0) {
+            state.alive = false;
+            addThought(
+              "CRITICAL FAILURE: HP depleted. Agent terminated.",
+              "bad",
+            );
+          }
+        } else if (cellType === BONUS) {
+          state.score += 30;
+          state.curiosity = Math.min(100, state.curiosity + 15);
+          state.map[nr][nc] = EMPTY;
+          addThought("Bonus collected! +30pts. Curiosity surge!", "good");
+        } else {
+          state.score += 1;
+        }
+
+        renderAll();
+        updateStats();
+      }
+
+      function addThought(text, cls) {
+        thoughts.unshift({ text, cls });
+        if (thoughts.length > 8) thoughts.pop();
+      }
+
+      function renderAll() {
+        renderGrid();
+        renderSenses();
+        updateBars();
+        updateThoughts();
+        updateBadge();
+      }
+
+      function renderGrid() {
+        const g = document.getElementById("grid");
+        g.style.gridTemplateColumns = `repeat(${COLS}, 38px)`;
+        g.innerHTML = "";
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const div = document.createElement("div");
+            div.className = "cell";
+            const isAgent = state.agent.r === r && state.agent.c === c;
+            const isPath =
+              !isAgent &&
+              state.path &&
+              state.path.some(([pr, pc]) => pr === r && pc === c);
+            if (isAgent) {
+              div.classList.add("agent");
+              div.textContent = "◉";
+            } else if (state.map[r][c] === WALL) {
+              div.classList.add("wall");
+            } else if (state.map[r][c] === GOAL) {
+              div.classList.add("goal");
+              div.textContent = "★";
+            } else if (state.map[r][c] === HAZARD) {
+              div.classList.add("hazard");
+              div.textContent = "✕";
+            } else if (state.map[r][c] === BONUS) {
+              div.classList.add("bonus");
+              div.textContent = "◆";
+            } else if (isPath) {
+              div.classList.add("path");
+            } else if (state.visited[r][c]) {
+              div.classList.add("visited");
+            } else {
+              div.classList.add("empty");
+            }
+            g.appendChild(div);
+          }
+        }
+      }
+
+      function renderSenses() {
+        const sg = document.getElementById("sense-grid");
+        sg.innerHTML = "";
+        const perception = perceive();
+        const icons = {
+          "-1": "",
+          [WALL]: "",
+          [EMPTY]: "",
+          [GOAL]: "★",
+          [HAZARD]: "✕",
+          [BONUS]: "◆",
+        };
+        const clsMap = {
+          [GOAL]: "goal-sense",
+          [HAZARD]: "danger-sense",
+          [BONUS]: "bonus-sense",
+          [WALL]: "wall-sense",
+        };
+        perception.forEach((val, i) => {
+          const div = document.createElement("div");
+          div.className =
+            "sense-cell" +
+            (i === 4 ? " self" : "") +
+            (clsMap[val] ? " " + clsMap[val] : "");
+          div.textContent = i === 4 ? "◉" : icons[val] || "";
+          sg.appendChild(div);
+        });
+      }
+
+      function updateBars() {
+        const { hp, curiosity, confidence } = state;
+        document.getElementById("hp-bar").style.width = hp + "%";
+        document.getElementById("hp-bar").style.background =
+          hp > 50 ? "#00e5a0" : hp > 25 ? "#ffb347" : "#ff4d6a";
+        document.getElementById("hp-val").textContent = Math.round(hp);
+        document.getElementById("cur-bar").style.width = curiosity + "%";
+        document.getElementById("cur-val").textContent = Math.round(curiosity);
+        document.getElementById("conf-bar").style.width = confidence + "%";
+        document.getElementById("conf-val").textContent =
+          Math.round(confidence);
+      }
+
+      function updateStats() {
+        document.getElementById("score-val").textContent = state.score;
+        document.getElementById("steps-val").textContent = state.steps;
+        document.getElementById("goals-val").textContent = state.goals;
+      }
+
+      function updateThoughts() {
+        const log = document.getElementById("thought-log");
+        log.innerHTML = thoughts
+          .map(
+            (t, i) =>
+              `<div class="thought-line ${i === 0 ? t.cls : ""}" style="opacity:${1 - i * 0.12}">> ${t.text}</div>`,
+          )
+          .join("");
+      }
+
+      function updateBadge() {
+        const b = document.getElementById("mode-badge");
+        b.className = "";
+        b.id = "mode-badge";
+        if (!state.alive) {
+          b.textContent = "Terminated";
+          b.classList.add("dead");
+        } else if (state.won) {
+          b.textContent = "Mission Complete";
+          b.classList.add("won");
+        } else if (!running) {
+          b.textContent = "Paused";
+          b.classList.add("paused");
+        } else {
+          b.textContent = "Running";
+        }
+      }
+
+      function getInterval() {
+        const s = parseInt(document.getElementById("speed").value);
+        return Math.max(80, 600 - s * 55);
+      }
+
+      function startLoop() {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = setInterval(() => {
+          if (running && !manualMode && state.alive && !state.won) step();
+        }, getInterval());
+      }
+
+      function togglePlay() {
+        running = !running;
+        document.getElementById("play-btn").textContent = running
+          ? "Pause"
+          : "Play";
+        updateBadge();
+      }
+
+      function stepOnce() {
+        if (!state.alive || state.won) return;
+        const wasRunning = running;
+        running = false;
+        step();
+        running = wasRunning;
+      }
+
+      function toggleMode() {
+        manualMode = !manualMode;
+        document.getElementById("mode-txt").textContent = manualMode
+          ? "Manual"
+          : "Auto";
+        addThought(
+          manualMode
+            ? "Manual mode: use arrow keys to move."
+            : "Auto mode: AI is back in control.",
+          "new",
+        );
+        updateThoughts();
+      }
+
+      function resetGame() {
+        clearInterval(intervalId);
+        initGame();
+        running = true;
+        document.getElementById("play-btn").textContent = "Pause";
+        renderAll();
+        updateStats();
+        startLoop();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (!manualMode || !state.alive || state.won) return;
+        const map = {
+          ArrowUp: [-1, 0],
+          ArrowDown: [1, 0],
+          ArrowLeft: [0, -1],
+          ArrowRight: [0, 1],
+        };
+        const d = map[e.key];
+        if (!d) return;
+        e.preventDefault();
+        const nr = state.agent.r + d[0],
+          nc = state.agent.c + d[1];
+        if (
+          nr < 0 ||
+          nr >= ROWS ||
+          nc < 0 ||
+          nc >= COLS ||
+          state.map[nr][nc] === WALL
+        )
+          return;
+        state.agent = { r: nr, c: nc };
+        state.steps++;
+        state.visited[nr][nc] = true;
+        const cell = state.map[nr][nc];
+        if (cell === GOAL) {
+          state.score += 100;
+          state.goals++;
+          state.map[nr][nc] = EMPTY;
+          state.goalsLeft = state.goalsLeft.filter(
+            ([gr, gc]) => !(gr === nr && gc === nc),
+          );
+          addThought("You reached a goal! +100pts", "good");
+          if (!state.goalsLeft.length) state.won = true;
+        } else if (cell === HAZARD) {
+          state.hp = Math.max(0, state.hp - 30);
+          state.score = Math.max(0, state.score - 20);
+          addThought("Ouch! You hit a hazard. -30 HP", "bad");
+          if (state.hp <= 0) state.alive = false;
+        } else if (cell === BONUS) {
+          state.score += 30;
+          state.map[nr][nc] = EMPTY;
+          addThought("Bonus collected! +30pts", "good");
+        }
+        renderAll();
+        updateStats();
+      });
+
+      document.getElementById("speed").addEventListener("input", startLoop);
+
+      initGame();
+      renderAll();
+      updateStats();
+      startLoop();
+    </script>
+  </body>
+</html>
